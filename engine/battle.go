@@ -1,8 +1,12 @@
 package engine
 
 import (
+	"bufio"
 	"fmt"
 	"math/rand"
+	"os"
+	"strconv"
+	"strings"
 
 	lua "github.com/yuin/gopher-lua"
 )
@@ -160,9 +164,60 @@ func (b *Battle) checkFaints() BattleResult {
 	return -1
 }
 
-func (b *Battle) enemyChooseMove() *Move {
-	for i := range b.Enemy.Moves {
-		return &b.Enemy.Moves[i]
+func (b *Battle) playerChooseMove() *Move {
+	scanner := bufio.NewScanner(os.Stdin)
+	for {
+		fmt.Println("\nChoose a move:")
+		for i, m := range b.Player.Moves {
+			fmt.Printf("  %d. %-16s (%s / %s / Pwr %d / PP %d/%d)\n",
+				i+1, m.Name, m.Type, m.Category, m.Power, m.PP, m.PPMax)
+		}
+		fmt.Print("> ")
+
+		if !scanner.Scan() {
+			continue
+		}
+		input := strings.TrimSpace(scanner.Text())
+		n, err := strconv.Atoi(input)
+		if err != nil || n < 1 || n > len(b.Player.Moves) {
+			fmt.Printf("Enter a number between 1 and %d.\n", len(b.Player.Moves))
+			continue
+		}
+		return &b.Player.Moves[n-1]
 	}
-	return nil
+}
+
+func (b *Battle) enemyChooseMove() *Move {
+	return &b.Enemy.Moves[rand.Intn(len(b.Enemy.Moves))]
+}
+
+func (b *Battle) Run() BattleResult {
+	fmt.Println("=== POKEMON BATTLE ===")
+	fmt.Printf("Your %s (Lv.%d) vs Enemy %s (Lv.%d)\n",
+		b.Player.Name, b.Player.Level, b.Enemy.Name, b.Enemy.Level)
+
+	for {
+		fmt.Printf("\n--- Turn %d ---\n", b.Turn)
+		fmt.Printf("Your:  %s\n", b.Player)
+		fmt.Printf("Enemy: %s\n", b.Enemy)
+
+		playerMove := b.playerChooseMove()
+		enemyMove := b.enemyChooseMove()
+
+		b.ResolveTurn(playerMove, enemyMove)
+		b.Turn++
+
+		if result := b.checkFaints(); result != -1 {
+			fmt.Println()
+			switch result {
+			case ResultPlayerWin:
+				fmt.Printf("Enemy %s fainted! You win!\n", b.Enemy.Name)
+			case ResultPlayerLoss:
+				fmt.Printf("%s fainted! You lose!\n", b.Player.Name)
+			case ResultDraw:
+				fmt.Println("Both Pokemon fainted! It's a draw!")
+			}
+			return result
+		}
+	}
 }

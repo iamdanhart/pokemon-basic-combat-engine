@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/iamdanhart/pokemon-basic-combat-engine/engine"
@@ -17,17 +16,16 @@ func main() {
 
 	bulbasaur := vm.Species["bulbasaur"]
 	charmander := vm.Species["charmander"]
-	vineWhip := vm.Moves["vine_whip"]
-	ember := vm.Moves["ember"]
 
-	player := engine.NewPokemon(bulbasaur, 5, []engine.Move{*vineWhip})
-	enemy := engine.NewPokemon(charmander, 5, []engine.Move{*ember})
+	player := engine.NewPokemon(bulbasaur, 5, []engine.Move{
+		*vm.Moves["vine_whip"],
+		*vm.Moves["thunder_wave"],
+	})
+	enemy := engine.NewPokemon(charmander, 5, []engine.Move{
+		*vm.Moves["ember"],
+		*vm.Moves["tackle"],
+	})
 
 	battle := engine.NewBattle(player, enemy, vm)
-
-	fmt.Println("=== POKEMON BATTLE ===")
-	fmt.Printf("Your:  %s\n", player)
-	fmt.Printf("Enemy: %s\n\n", enemy)
-
-	battle.ResolveTurn(vineWhip, ember)
+	battle.Run()
 }
