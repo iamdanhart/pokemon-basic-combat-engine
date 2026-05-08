@@ -14,6 +14,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Dereference to copy each Move so each Pokemon tracks PP independently.
 	player := engine.NewPokemon(vm.MustSpecies("bulbasaur"), 5, []engine.Move{
 		*vm.MustMove("vine_whip"),
 		*vm.MustMove("thunder_wave"),
