@@ -278,6 +278,27 @@ func TestBadPoisonScales(t *testing.T) {
 	}
 }
 
+func TestBadPoisonCaps(t *testing.T) {
+	s := testSpecies()
+	p := NewPokemon(s, 50, nil)
+	p.StatusEffect = StatusBadPoison
+	p.StatusTurns = 15
+
+	b := newScriptedBattle(t, p, p)
+
+	before := p.HP
+	b.applyTurnEnd(p)
+	turn15Damage := before - p.HP
+
+	p.HP = p.MaxHP
+	b.applyTurnEnd(p)
+	turn16Damage := p.MaxHP - p.HP
+
+	if turn16Damage != turn15Damage {
+		t.Errorf("expected damage to cap at turn 15 (%d), got %d at turn 16", turn15Damage, turn16Damage)
+	}
+}
+
 func TestSleepSkipsTurn(t *testing.T) {
 	s := testSpecies()
 	p := NewPokemon(s, 50, nil)
