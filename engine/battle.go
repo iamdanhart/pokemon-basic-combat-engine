@@ -225,20 +225,20 @@ func (b *Battle) ResolveTurn(playerMove, enemyMove *Move) {
 	}
 }
 
-func (b *Battle) checkFaints() BattleResult {
+func (b *Battle) checkFaints() (BattleResult, bool) {
 	playerFainted := b.Player.IsFainted()
 	enemyFainted := b.Enemy.IsFainted()
 
 	if playerFainted && enemyFainted {
-		return ResultDraw
+		return ResultDraw, true
 	}
 	if playerFainted {
-		return ResultPlayerLoss
+		return ResultPlayerLoss, true
 	}
 	if enemyFainted {
-		return ResultPlayerWin
+		return ResultPlayerWin, true
 	}
-	return -1
+	return 0, false
 }
 
 func (b *Battle) playerChooseMove() (*Move, bool) {
@@ -319,7 +319,7 @@ func (b *Battle) Run() BattleResult {
 		b.ResolveTurn(playerMove, enemyMove)
 		b.Turn++
 
-		if result := b.checkFaints(); result != -1 {
+		if result, fainted := b.checkFaints(); fainted {
 			fmt.Println()
 			switch result {
 			case ResultPlayerWin:
