@@ -51,7 +51,11 @@ func (b *Battle) applyMove(actor, target *Pokemon, move *Move) {
 	move.PP--
 
 	if move.Category == CategoryStatus {
+		prevStatus := target.StatusEffect
 		b.callLuaEffect(actor, target, move)
+		if prevStatus == StatusNone && target.StatusEffect != StatusNone {
+			fmt.Printf("%s was %s!\n", target.Name, target.StatusEffect)
+		}
 		return
 	}
 
@@ -124,6 +128,7 @@ func pokemonToLuaTable(L *lua.LState, p *Pokemon) *lua.LTable {
 	L.SetField(t, "def", lua.LNumber(p.Def))
 	L.SetField(t, "spd", lua.LNumber(p.Spd))
 	L.SetField(t, "status", lua.LNumber(p.StatusEffect))
+	L.SetField(t, "status_turns", lua.LNumber(p.StatusTurns))
 	return t
 }
 
@@ -133,6 +138,48 @@ func syncFromLuaTable(p *Pokemon, t *lua.LTable) {
 	p.Def = int(lua.LVAsNumber(t.RawGetString("def")))
 	p.Spd = int(lua.LVAsNumber(t.RawGetString("spd")))
 	p.StatusEffect = StatusEffect(lua.LVAsNumber(t.RawGetString("status")))
+	p.StatusTurns = int(lua.LVAsNumber(t.RawGetString("status_turns")))
+}
+
+// callStatusHook calls the named Lua hook for a Pokemon's status effect.
+// Returns true if the Pokemon's turn should be skipped.
+func (b *Battle) callStatusHook(hookName string, p *Pokemon) bool {
+	if hookName == "" {
+		return false
+	}
+
+	tbl := pokemonToLuaTable(b.vm.L, p)
+	b.vm.L.SetField(tbl, "skip_turn", lua.LFalse)
+
+	err := b.vm.L.CallByParam(lua.P{
+		Fn:      b.vm.L.GetGlobal(hookName),
+		NRet:    0,
+		Protect: true,
+	}, tbl)
+
+	if err != nil {
+		fmt.Printf("[lua status hook error] %s: %v\n", hookName, err)
+		return false
+	}
+
+	syncFromLuaTable(p, tbl)
+	return tbl.RawGetString("skip_turn") == lua.LTrue
+}
+
+func (b *Battle) applyTurnStart(p *Pokemon) bool {
+	if p.StatusEffect == StatusNone {
+		return false
+	}
+	hooks := b.vm.StatusHooks[p.StatusEffect]
+	return b.callStatusHook(hooks.OnTurnStart, p)
+}
+
+func (b *Battle) applyTurnEnd(p *Pokemon) {
+	if p.StatusEffect == StatusNone {
+		return
+	}
+	hooks := b.vm.StatusHooks[p.StatusEffect]
+	b.callStatusHook(hooks.OnTurnEnd, p)
 }
 
 func (b *Battle) ResolveTurn(playerMove, enemyMove *Move) {
@@ -141,12 +188,27 @@ func (b *Battle) ResolveTurn(playerMove, enemyMove *Move) {
 		first, firstMove, second, secondMove = b.Enemy, enemyMove, b.Player, playerMove
 	}
 
-	fmt.Printf("\n%s used %s!\n", first.Name, firstMove.Name)
-	b.applyMove(first, second, firstMove)
+	if !b.applyTurnStart(first) {
+		fmt.Printf("\n%s used %s!\n", first.Name, firstMove.Name)
+		b.applyMove(first, second, firstMove)
+	} else {
+		fmt.Printf("\n%s is %s! It can't move!\n", first.Name, first.StatusEffect)
+	}
 
 	if !second.IsFainted() {
-		fmt.Printf("%s used %s!\n", second.Name, secondMove.Name)
-		b.applyMove(second, first, secondMove)
+		if !b.applyTurnStart(second) {
+			fmt.Printf("%s used %s!\n", second.Name, secondMove.Name)
+			b.applyMove(second, first, secondMove)
+		} else {
+			fmt.Printf("%s is %s! It can't move!\n", second.Name, second.StatusEffect)
+		}
+	}
+
+	if !b.Player.IsFainted() {
+		b.applyTurnEnd(b.Player)
+	}
+	if !b.Enemy.IsFainted() {
+		b.applyTurnEnd(b.Enemy)
 	}
 }
 

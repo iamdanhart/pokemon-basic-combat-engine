@@ -34,6 +34,7 @@ type Pokemon struct {
 	Spd          int
 	Moves        []Move
 	StatusEffect StatusEffect
+	StatusTurns  int // turns remaining for timed statuses (sleep, freeze)
 }
 
 func NewPokemon(s *Species, level int, moves []Move) *Pokemon {
@@ -49,6 +50,23 @@ func NewPokemon(s *Species, level int, moves []Move) *Pokemon {
 		Def:     stat(s.BaseDef),
 		Spd:     stat(s.BaseSpd),
 		Moves:   moves,
+	}
+}
+
+func (s StatusEffect) String() string {
+	switch s {
+	case StatusBurn:
+		return "burned"
+	case StatusParalyze:
+		return "paralyzed"
+	case StatusSleep:
+		return "asleep"
+	case StatusPoison:
+		return "poisoned"
+	case StatusFreeze:
+		return "frozen"
+	default:
+		return ""
 	}
 }
 

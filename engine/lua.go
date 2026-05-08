@@ -2,21 +2,34 @@ package engine
 
 import (
 	"fmt"
+	"time"
 
 	lua "github.com/yuin/gopher-lua"
 )
 
+type StatusHooks struct {
+	OnTurnStart string // Lua global name, empty if no hook
+	OnTurnEnd   string
+}
+
 type VM struct {
-	L       *lua.LState
-	Species map[string]*Species
-	Moves   map[string]*Move
+	L           *lua.LState
+	Species     map[string]*Species
+	Moves       map[string]*Move
+	StatusHooks map[StatusEffect]StatusHooks
 }
 
 func NewVM() *VM {
+	L := lua.NewState()
+	// Seed Lua's math.random with the current time so rolls vary each run
+	if err := L.DoString(fmt.Sprintf("math.randomseed(%d)", time.Now().UnixNano())); err != nil {
+		panic(fmt.Sprintf("failed to seed Lua RNG: %v", err))
+	}
 	return &VM{
-		L:       lua.NewState(),
-		Species: make(map[string]*Species),
-		Moves:   make(map[string]*Move),
+		L:           L,
+		Species:     make(map[string]*Species),
+		Moves:       make(map[string]*Move),
+		StatusHooks: make(map[StatusEffect]StatusHooks),
 	}
 }
 
@@ -37,6 +50,13 @@ func (vm *VM) LoadScripts(dir string) error {
 	}
 	if err := vm.loadMoves(); err != nil {
 		return fmt.Errorf("parsing moves.lua: %w", err)
+	}
+
+	if err := vm.L.DoFile(dir + "/status_effects.lua"); err != nil {
+		return fmt.Errorf("loading status_effects.lua: %w", err)
+	}
+	if err := vm.loadStatusHooks(); err != nil {
+		return fmt.Errorf("parsing status_effects.lua: %w", err)
 	}
 
 	return nil
@@ -143,6 +163,56 @@ func (vm *VM) loadMoves() error {
 		}
 
 		vm.Moves[lua.LVAsString(key)] = m
+	})
+
+	return outerErr
+}
+
+var statusEffectNames = map[string]StatusEffect{
+	"burn":      StatusBurn,
+	"paralysis": StatusParalyze,
+	"sleep":     StatusSleep,
+	"poison":    StatusPoison,
+	"freeze":    StatusFreeze,
+}
+
+func (vm *VM) loadStatusHooks() error {
+	tbl, ok := vm.L.GetGlobal("StatusEffects").(*lua.LTable)
+	if !ok {
+		return fmt.Errorf("expected StatusEffects to be a table")
+	}
+
+	var outerErr error
+	tbl.ForEach(func(key, val lua.LValue) {
+		if outerErr != nil {
+			return
+		}
+		entry, ok := val.(*lua.LTable)
+		if !ok {
+			return
+		}
+
+		name := lua.LVAsString(key)
+		status, ok := statusEffectNames[name]
+		if !ok {
+			outerErr = fmt.Errorf("unknown status effect %q", name)
+			return
+		}
+
+		hooks := StatusHooks{}
+
+		if fn, ok := entry.RawGetString("on_turn_start").(*lua.LFunction); ok {
+			fnName := "status_" + name + "_on_turn_start"
+			vm.L.SetGlobal(fnName, fn)
+			hooks.OnTurnStart = fnName
+		}
+		if fn, ok := entry.RawGetString("on_turn_end").(*lua.LFunction); ok {
+			fnName := "status_" + name + "_on_turn_end"
+			vm.L.SetGlobal(fnName, fn)
+			hooks.OnTurnEnd = fnName
+		}
+
+		vm.StatusHooks[status] = hooks
 	})
 
 	return outerErr
