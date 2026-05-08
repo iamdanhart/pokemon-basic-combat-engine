@@ -227,3 +227,19 @@ func (vm *VM) loadStatusHooks() error {
 
 	return outerErr
 }
+
+func (vm *VM) MustSpecies(key string) *Species {
+	s, ok := vm.Species[key]
+	if !ok {
+		panic(fmt.Sprintf("unknown species %q", key))
+	}
+	return s
+}
+
+func (vm *VM) MustMove(key string) *Move {
+	m, ok := vm.Moves[key]
+	if !ok {
+		panic(fmt.Sprintf("unknown move %q", key))
+	}
+	return m
+}

@@ -38,6 +38,7 @@ Species and move data are defined in `scripts/` as Lua tables and loaded at star
 
 ## Known Issues
 
+- **Battle is hardcoded.** `main.go` always starts Bulbasaur vs Charmander at level 5 with fixed moves. There is no species or move selection.
 - **Type-ahead input is not discarded between turns.** Input typed during turn resolution is buffered and consumed as the next move choice. Invalid input is rejected and the player is re-prompted, so this is recoverable but may be surprising.
 
 ## Running
