@@ -14,16 +14,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	bulbasaur := vm.Species["bulbasaur"]
-	charmander := vm.Species["charmander"]
-
-	player := engine.NewPokemon(bulbasaur, 5, []engine.Move{
-		*vm.Moves["vine_whip"],
-		*vm.Moves["thunder_wave"],
+	player := engine.NewPokemon(vm.MustSpecies("bulbasaur"), 5, []engine.Move{
+		*vm.MustMove("vine_whip"),
+		*vm.MustMove("thunder_wave"),
 	})
-	enemy := engine.NewPokemon(charmander, 5, []engine.Move{
-		*vm.Moves["ember"],
-		*vm.Moves["tackle"],
+	enemy := engine.NewPokemon(vm.MustSpecies("charmander"), 5, []engine.Move{
+		*vm.MustMove("ember"),
+		*vm.MustMove("tackle"),
 	})
 
 	battle := engine.NewBattle(player, enemy, vm)
