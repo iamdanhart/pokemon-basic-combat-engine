@@ -239,7 +239,14 @@ func (b *Battle) checkFaints() (BattleResult, bool) {
 }
 
 func (b *Battle) playerChooseMove() (*Move, bool) {
-	if b.allOutOfPP(b.Player) {
+	allOut := true
+	for _, m := range b.Player.Moves {
+		if m.PP > 0 {
+			allOut = false
+			break
+		}
+	}
+	if allOut {
 		fmt.Fprintf(b.out, "\n%s has no PP left and must use Struggle!\n", b.Player.Name)
 		return &struggleMove, true
 	}
@@ -267,15 +274,6 @@ func (b *Battle) playerChooseMove() (*Move, bool) {
 		}
 		return move, true
 	}
-}
-
-func (b *Battle) allOutOfPP(p *Pokemon) bool {
-	for _, m := range p.Moves {
-		if m.PP > 0 {
-			return false
-		}
-	}
-	return true
 }
 
 func (b *Battle) enemyChooseMove() *Move {

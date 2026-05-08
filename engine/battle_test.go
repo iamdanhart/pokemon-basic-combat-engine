@@ -194,20 +194,3 @@ func TestStruggleRecoil(t *testing.T) {
 		t.Errorf("expected attacker HP %d after recoil, got %d", attacker.MaxHP-wantRecoil, attacker.HP)
 	}
 }
-
-func TestAllOutOfPP(t *testing.T) {
-	s := testSpecies()
-	p := NewPokemon(s, 50, []Move{
-		{PP: 0, PPMax: 10},
-		{PP: 0, PPMax: 10},
-	})
-	b := newTestBattle(p, p)
-	if !b.allOutOfPP(p) {
-		t.Error("expected allOutOfPP to return true")
-	}
-
-	p.Moves[0].PP = 1
-	if b.allOutOfPP(p) {
-		t.Error("expected allOutOfPP to return false when one move has PP")
-	}
-}
