@@ -204,7 +204,7 @@ func (b *Battle) applyTurnEnd(p *Pokemon) {
 	b.callStatusHook(hooks.OnTurnEnd, p)
 }
 
-func (b *Battle) ResolveTurn(playerMove, enemyMove *Move) {
+func (b *Battle) resolveTurn(playerMove, enemyMove *Move) {
 	first, firstMove, second, secondMove := b.Player, playerMove, b.Enemy, enemyMove
 	if b.Enemy.Spd > b.Player.Spd || (b.Enemy.Spd == b.Player.Spd && rand.Intn(2) == 0) {
 		first, firstMove, second, secondMove = b.Enemy, enemyMove, b.Player, playerMove
@@ -325,7 +325,7 @@ func (b *Battle) Run() BattleResult {
 		}
 		enemyMove := b.enemyChooseMove()
 
-		b.ResolveTurn(playerMove, enemyMove)
+		b.resolveTurn(playerMove, enemyMove)
 		b.Turn++
 
 		if result, fainted := b.checkFaints(); fainted {

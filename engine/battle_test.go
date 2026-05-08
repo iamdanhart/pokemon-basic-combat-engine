@@ -172,7 +172,7 @@ func TestResolveTurnFasterGoesFirst(t *testing.T) {
 	b := newTestBattle(player, enemy)
 	enemyPPBefore := enemy.Moves[0].PP
 
-	b.ResolveTurn(&player.Moves[0], &enemy.Moves[0])
+	b.resolveTurn(&player.Moves[0], &enemy.Moves[0])
 
 	if enemy.Moves[0].PP != enemyPPBefore {
 		t.Error("enemy moved despite being KO'd by the faster player")
