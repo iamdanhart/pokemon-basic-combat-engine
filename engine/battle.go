@@ -3,6 +3,7 @@ package engine
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"strconv"
@@ -37,6 +38,7 @@ type Battle struct {
 	Turn    int
 	vm      *VM
 	scanner *bufio.Scanner
+	out     io.Writer
 }
 
 var struggleMove = Move{
@@ -55,6 +57,7 @@ func NewBattle(player, enemy *Pokemon, vm *VM) *Battle {
 		Turn:    1,
 		vm:      vm,
 		scanner: bufio.NewScanner(os.Stdin),
+		out:     os.Stdout,
 	}
 }
 
@@ -67,14 +70,14 @@ func (b *Battle) applyMove(actor, target *Pokemon, move *Move) {
 		prevStatus := target.StatusEffect
 		b.callLuaEffect(actor, target, move)
 		if prevStatus == StatusNone && target.StatusEffect != StatusNone {
-			fmt.Printf("%s was %s!\n", target.Name, target.StatusEffect)
+			fmt.Fprintf(b.out, "%s was %s!\n", target.Name, target.StatusEffect)
 		}
 		return
 	}
 
 	// Accuracy == 0 is a sentinel meaning always hits
 	if move.Accuracy > 0 && rand.Intn(100)+1 > move.Accuracy {
-		fmt.Printf("%s's attack missed!\n", actor.Name)
+		fmt.Fprintf(b.out, "%s's attack missed!\n", actor.Name)
 		return
 	}
 
@@ -92,16 +95,16 @@ func (b *Battle) applyMove(actor, target *Pokemon, move *Move) {
 	}
 
 	if eff > 1.0 {
-		fmt.Println("It's super effective!")
+		fmt.Fprintln(b.out, "It's super effective!")
 	} else if eff < 1.0 && eff > 0 {
-		fmt.Println("It's not very effective...")
+		fmt.Fprintln(b.out, "It's not very effective...")
 	} else if eff == 0 {
-		fmt.Printf("It doesn't affect %s...\n", target.Name)
+		fmt.Fprintf(b.out, "It doesn't affect %s...\n", target.Name)
 		return
 	}
 
 	target.HP -= damage
-	fmt.Printf("%s took %d damage! %s\n", target.Name, damage, target)
+	fmt.Fprintf(b.out, "%s took %d damage! %s\n", target.Name, damage, target)
 }
 
 // Modified Gen 1 formula - omits the random factor and STAB bonus for simplicity
@@ -124,7 +127,7 @@ func (b *Battle) callLuaEffect(actor, target *Pokemon, move *Move) {
 	}, actorTbl, targetTbl)
 
 	if err != nil {
-		fmt.Printf("[lua effect error] %s: %v\n", move.EffectFunc, err)
+		fmt.Fprintf(b.out, "[lua effect error] %s: %v\n", move.EffectFunc, err)
 		return
 	}
 
@@ -171,7 +174,7 @@ func (b *Battle) callStatusHook(hookName string, p *Pokemon) bool {
 	}, tbl)
 
 	if err != nil {
-		fmt.Printf("[lua status hook error] %s: %v\n", hookName, err)
+		fmt.Fprintf(b.out, "[lua status hook error] %s: %v\n", hookName, err)
 		return false
 	}
 
@@ -202,18 +205,18 @@ func (b *Battle) ResolveTurn(playerMove, enemyMove *Move) {
 	}
 
 	if !b.applyTurnStart(first) {
-		fmt.Printf("\n%s used %s!\n", first.Name, firstMove.Name)
+		fmt.Fprintf(b.out, "\n%s used %s!\n", first.Name, firstMove.Name)
 		b.applyMove(first, second, firstMove)
 	} else {
-		fmt.Printf("\n%s is %s! It can't move!\n", first.Name, first.StatusEffect)
+		fmt.Fprintf(b.out, "\n%s is %s! It can't move!\n", first.Name, first.StatusEffect)
 	}
 
 	if !second.IsFainted() {
 		if !b.applyTurnStart(second) {
-			fmt.Printf("%s used %s!\n", second.Name, secondMove.Name)
+			fmt.Fprintf(b.out, "%s used %s!\n", second.Name, secondMove.Name)
 			b.applyMove(second, first, secondMove)
 		} else {
-			fmt.Printf("%s is %s! It can't move!\n", second.Name, second.StatusEffect)
+			fmt.Fprintf(b.out, "%s is %s! It can't move!\n", second.Name, second.StatusEffect)
 		}
 	}
 
@@ -243,16 +246,16 @@ func (b *Battle) checkFaints() (BattleResult, bool) {
 
 func (b *Battle) playerChooseMove() (*Move, bool) {
 	if b.allOutOfPP(b.Player) {
-		fmt.Printf("\n%s has no PP left and must use Struggle!\n", b.Player.Name)
+		fmt.Fprintf(b.out, "\n%s has no PP left and must use Struggle!\n", b.Player.Name)
 		return &struggleMove, true
 	}
 	for {
-		fmt.Println("\nChoose a move:")
+		fmt.Fprintln(b.out, "\nChoose a move:")
 		for i, m := range b.Player.Moves {
-			fmt.Printf("  %d. %-16s (%s / %s / Pwr %d / PP %d/%d)\n",
+			fmt.Fprintf(b.out, "  %d. %-16s (%s / %s / Pwr %d / PP %d/%d)\n",
 				i+1, m.Name, m.Type, m.Category, m.Power, m.PP, m.PPMax)
 		}
-		fmt.Print("> ")
+		fmt.Fprint(b.out, "> ")
 
 		if !b.scanner.Scan() {
 			return nil, false
@@ -260,12 +263,12 @@ func (b *Battle) playerChooseMove() (*Move, bool) {
 		input := strings.TrimSpace(b.scanner.Text())
 		n, err := strconv.Atoi(input)
 		if err != nil || n < 1 || n > len(b.Player.Moves) {
-			fmt.Printf("Enter a number between 1 and %d.\n", len(b.Player.Moves))
+			fmt.Fprintf(b.out, "Enter a number between 1 and %d.\n", len(b.Player.Moves))
 			continue
 		}
 		move := &b.Player.Moves[n-1]
 		if move.PP <= 0 {
-			fmt.Println("That move has no PP left!")
+			fmt.Fprintln(b.out, "That move has no PP left!")
 			continue
 		}
 		return move, true
@@ -300,18 +303,18 @@ func (b *Battle) enemyChooseMove() *Move {
 }
 
 func (b *Battle) Run() BattleResult {
-	fmt.Println("=== POKEMON BATTLE ===")
-	fmt.Printf("Your %s (Lv.%d) vs Enemy %s (Lv.%d)\n",
+	fmt.Fprintln(b.out, "=== POKEMON BATTLE ===")
+	fmt.Fprintf(b.out, "Your %s (Lv.%d) vs Enemy %s (Lv.%d)\n",
 		b.Player.Name, b.Player.Level, b.Enemy.Name, b.Enemy.Level)
 
 	for {
-		fmt.Printf("\n--- Turn %d ---\n", b.Turn)
-		fmt.Printf("Your:  %s\n", b.Player)
-		fmt.Printf("Enemy: %s\n", b.Enemy)
+		fmt.Fprintf(b.out, "\n--- Turn %d ---\n", b.Turn)
+		fmt.Fprintf(b.out, "Your:  %s\n", b.Player)
+		fmt.Fprintf(b.out, "Enemy: %s\n", b.Enemy)
 
 		playerMove, ok := b.playerChooseMove()
 		if !ok {
-			fmt.Println("\nBattle aborted.")
+			fmt.Fprintln(b.out, "\nBattle aborted.")
 			return ResultAborted
 		}
 		enemyMove := b.enemyChooseMove()
@@ -320,14 +323,14 @@ func (b *Battle) Run() BattleResult {
 		b.Turn++
 
 		if result, fainted := b.checkFaints(); fainted {
-			fmt.Println()
+			fmt.Fprintln(b.out)
 			switch result {
 			case ResultPlayerWin:
-				fmt.Printf("Enemy %s fainted! You win!\n", b.Enemy.Name)
+				fmt.Fprintf(b.out, "Enemy %s fainted! You win!\n", b.Enemy.Name)
 			case ResultPlayerLoss:
-				fmt.Printf("%s fainted! You lose!\n", b.Player.Name)
+				fmt.Fprintf(b.out, "%s fainted! You lose!\n", b.Player.Name)
 			case ResultDraw:
-				fmt.Println("Both Pokemon fainted! It's a draw!")
+				fmt.Fprintln(b.out, "Both Pokemon fainted! It's a draw!")
 			case ResultAborted:
 				// handled above before ResolveTurn
 			}
