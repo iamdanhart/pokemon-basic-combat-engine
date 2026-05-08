@@ -20,7 +20,6 @@ A simplified Pokemon-style combat engine built in Go with Lua scripting. This is
 - No recoil moves (e.g. Double-Edge)
 - No binding moves (e.g. Wrap)
 - No self-destruct moves (e.g. Explosion)
-- No Struggle when PP is depleted
 
 ## Conventions
 
@@ -36,6 +35,10 @@ The engine is split into two layers:
 - **Lua** - species data, move data, move effects, status effect hooks
 
 Species and move data are defined in `scripts/` as Lua tables and loaded at startup. Non-damaging move effects and status condition behavior (burn, paralysis, etc.) are scripted as Lua callbacks, keeping content changes out of the compiled engine.
+
+## Known Issues
+
+- **Type-ahead input is not discarded between turns.** Input typed during turn resolution is buffered and consumed as the next move choice. Invalid input is rejected and the player is re-prompted, so this is recoverable but may be surprising.
 
 ## Running
 
