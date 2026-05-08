@@ -27,6 +27,22 @@ func newTestBattle(player, enemy *Pokemon) *Battle {
 	}
 }
 
+// newScriptedBattle loads the real Lua scripts so status hooks are available.
+func newScriptedBattle(t *testing.T, player, enemy *Pokemon) *Battle {
+	t.Helper()
+	vm := NewVM()
+	if err := vm.LoadScripts("../scripts"); err != nil {
+		t.Fatalf("LoadScripts: %v", err)
+	}
+	return &Battle{
+		Player: player,
+		Enemy:  enemy,
+		Turn:   1,
+		vm:     vm,
+		out:    io.Discard,
+	}
+}
+
 func TestCalcDamage(t *testing.T) {
 	s := testSpecies()
 	attacker := NewPokemon(s, 50, nil)
@@ -193,4 +209,122 @@ func TestStruggleRecoil(t *testing.T) {
 	if attacker.HP != attacker.MaxHP-wantRecoil {
 		t.Errorf("expected attacker HP %d after recoil, got %d", attacker.MaxHP-wantRecoil, attacker.HP)
 	}
+}
+
+func TestTypeImmunity(t *testing.T) {
+	normal := &Species{Name: "Normal", Types: [2]Type{TypeNormal}, NumTypes: 1, BaseHP: 45, BaseAtk: 49, BaseDef: 49, BaseSpd: 45}
+	ghost := &Species{Name: "Ghost", Types: [2]Type{TypeGhost}, NumTypes: 1, BaseHP: 45, BaseAtk: 49, BaseDef: 49, BaseSpd: 45}
+
+	attacker := NewPokemon(normal, 50, nil)
+	defender := NewPokemon(ghost, 50, nil)
+	move := testMove(40, 0)
+
+	b := newTestBattle(attacker, defender)
+	b.applyMove(attacker, defender, &move)
+
+	if defender.HP != defender.MaxHP {
+		t.Errorf("Normal move should deal no damage to Ghost type, but HP dropped from %d to %d", defender.MaxHP, defender.HP)
+	}
+}
+
+func TestBurnDamage(t *testing.T) {
+	s := testSpecies()
+	p := NewPokemon(s, 50, nil)
+	p.StatusEffect = StatusBurn
+
+	b := newScriptedBattle(t, p, p)
+	before := p.HP
+	b.applyTurnEnd(p)
+
+	want := before - p.MaxHP/8
+	if p.HP != want {
+		t.Errorf("expected HP %d after burn, got %d", want, p.HP)
+	}
+}
+
+func TestPoisonDamage(t *testing.T) {
+	s := testSpecies()
+	p := NewPokemon(s, 50, nil)
+	p.StatusEffect = StatusPoison
+
+	b := newScriptedBattle(t, p, p)
+	before := p.HP
+	b.applyTurnEnd(p)
+
+	want := before - p.MaxHP/16
+	if p.HP != want {
+		t.Errorf("expected HP %d after poison, got %d", want, p.HP)
+	}
+}
+
+func TestBadPoisonScales(t *testing.T) {
+	s := testSpecies()
+	p := NewPokemon(s, 50, nil)
+	p.StatusEffect = StatusBadPoison
+	p.StatusTurns = 1
+
+	b := newScriptedBattle(t, p, p)
+
+	before := p.HP
+	b.applyTurnEnd(p)
+	firstDamage := before - p.HP
+
+	before = p.HP
+	b.applyTurnEnd(p)
+	secondDamage := before - p.HP
+
+	if secondDamage <= firstDamage {
+		t.Errorf("bad poison damage should increase each turn: turn1=%d turn2=%d", firstDamage, secondDamage)
+	}
+}
+
+func TestSleepSkipsTurn(t *testing.T) {
+	s := testSpecies()
+	p := NewPokemon(s, 50, nil)
+	p.StatusEffect = StatusSleep
+	p.StatusTurns = 3
+
+	b := newScriptedBattle(t, p, p)
+	skipped := b.applyTurnStart(p)
+
+	if !skipped {
+		t.Error("expected sleep to skip turn when turns remain")
+	}
+	if p.StatusTurns != 2 {
+		t.Errorf("expected status_turns 2, got %d", p.StatusTurns)
+	}
+}
+
+func TestSleepWakesUp(t *testing.T) {
+	s := testSpecies()
+	p := NewPokemon(s, 50, nil)
+	p.StatusEffect = StatusSleep
+	p.StatusTurns = 0
+
+	b := newScriptedBattle(t, p, p)
+	b.applyTurnStart(p)
+
+	if p.StatusEffect != StatusNone {
+		t.Errorf("expected sleep to clear at 0 turns, got %v", p.StatusEffect)
+	}
+}
+
+func TestMustSpeciesPanic(t *testing.T) {
+	vm := NewVM()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for unknown species key")
+		}
+	}()
+	vm.MustSpecies("unknown")
+}
+
+func TestMustMovePanic(t *testing.T) {
+	vm := NewVM()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for unknown move key")
+		}
+	}()
+	vm.MustMove("unknown")
 }

@@ -43,4 +43,10 @@ StatusEffects = {
             end
         end,
     },
+    bad_poison = {
+        on_turn_end = function(pokemon)
+            pokemon.hp = pokemon.hp - math.floor(pokemon.max_hp / 16 * pokemon.status_turns)
+            pokemon.status_turns = pokemon.status_turns + 1
+        end,
+    },
 }

@@ -11,6 +11,7 @@ const (
 	StatusSleep
 	StatusPoison
 	StatusFreeze
+	StatusBadPoison // applied by Toxic; damage scales up each turn via status_turns
 )
 
 type Species struct {
@@ -65,6 +66,8 @@ func (s StatusEffect) String() string {
 		return "poisoned"
 	case StatusFreeze:
 		return "frozen"
+	case StatusBadPoison:
+		return "badly poisoned"
 	default:
 		return ""
 	}

@@ -32,7 +32,8 @@ func NewVM() *VM {
 	L.SetField(statusConsts, "paralysis", lua.LNumber(StatusParalyze))
 	L.SetField(statusConsts, "sleep",     lua.LNumber(StatusSleep))
 	L.SetField(statusConsts, "poison",    lua.LNumber(StatusPoison))
-	L.SetField(statusConsts, "freeze",    lua.LNumber(StatusFreeze))
+	L.SetField(statusConsts, "freeze",     lua.LNumber(StatusFreeze))
+	L.SetField(statusConsts, "bad_poison", lua.LNumber(StatusBadPoison))
 	L.SetGlobal("Status", statusConsts)
 
 	return &VM{
@@ -179,11 +180,12 @@ func (vm *VM) loadMoves() error {
 }
 
 var statusEffectNames = map[string]StatusEffect{
-	"burn":      StatusBurn,
-	"paralysis": StatusParalyze,
-	"sleep":     StatusSleep,
-	"poison":    StatusPoison,
-	"freeze":    StatusFreeze,
+	"burn":       StatusBurn,
+	"paralysis":  StatusParalyze,
+	"sleep":      StatusSleep,
+	"poison":     StatusPoison,
+	"freeze":     StatusFreeze,
+	"bad_poison": StatusBadPoison,
 }
 
 func (vm *VM) loadStatusHooks() error {
