@@ -27,28 +27,41 @@ const (
 	ResultPlayerWin BattleResult = iota
 	ResultPlayerLoss
 	ResultDraw
+	ResultAborted
 )
 
 type Battle struct {
-	Player *Pokemon
-	Enemy  *Pokemon
-	State  BattleState
-	Turn   int
-	vm     *VM
+	Player  *Pokemon
+	Enemy   *Pokemon
+	State   BattleState
+	Turn    int
+	vm      *VM
+	scanner *bufio.Scanner
+}
+
+var struggleMove = Move{
+	Name:     "Struggle",
+	Type:     TypeNormal,
+	Category: CategoryPhysical,
+	Power:    50,
+	Accuracy: 0, // always hits
 }
 
 func NewBattle(player, enemy *Pokemon, vm *VM) *Battle {
 	return &Battle{
-		Player: player,
-		Enemy:  enemy,
-		State:  StateStart,
-		Turn:   1,
-		vm:     vm,
+		Player:  player,
+		Enemy:   enemy,
+		State:   StateStart,
+		Turn:    1,
+		vm:      vm,
+		scanner: bufio.NewScanner(os.Stdin),
 	}
 }
 
 func (b *Battle) applyMove(actor, target *Pokemon, move *Move) {
-	move.PP--
+	if move.PPMax > 0 {
+		move.PP--
+	}
 
 	if move.Category == CategoryStatus {
 		prevStatus := target.StatusEffect
@@ -228,8 +241,11 @@ func (b *Battle) checkFaints() BattleResult {
 	return -1
 }
 
-func (b *Battle) playerChooseMove() *Move {
-	scanner := bufio.NewScanner(os.Stdin)
+func (b *Battle) playerChooseMove() (*Move, bool) {
+	if b.allOutOfPP(b.Player) {
+		fmt.Printf("\n%s has no PP left and must use Struggle!\n", b.Player.Name)
+		return &struggleMove, true
+	}
 	for {
 		fmt.Println("\nChoose a move:")
 		for i, m := range b.Player.Moves {
@@ -238,10 +254,10 @@ func (b *Battle) playerChooseMove() *Move {
 		}
 		fmt.Print("> ")
 
-		if !scanner.Scan() {
-			continue
+		if !b.scanner.Scan() {
+			return nil, false
 		}
-		input := strings.TrimSpace(scanner.Text())
+		input := strings.TrimSpace(b.scanner.Text())
 		n, err := strconv.Atoi(input)
 		if err != nil || n < 1 || n > len(b.Player.Moves) {
 			fmt.Printf("Enter a number between 1 and %d.\n", len(b.Player.Moves))
@@ -252,25 +268,35 @@ func (b *Battle) playerChooseMove() *Move {
 			fmt.Println("That move has no PP left!")
 			continue
 		}
-		return move
+		return move, true
 	}
 }
 
+func (b *Battle) allOutOfPP(p *Pokemon) bool {
+	for _, m := range p.Moves {
+		if m.PP > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (b *Battle) enemyChooseMove() *Move {
-	// try up to 10 times to find a move with PP remaining
+	if b.allOutOfPP(b.Enemy) {
+		return &struggleMove
+	}
 	for range 10 {
 		m := &b.Enemy.Moves[rand.Intn(len(b.Enemy.Moves))]
 		if m.PP > 0 {
 			return m
 		}
 	}
-	// fallback: return the first move with PP
 	for i := range b.Enemy.Moves {
 		if b.Enemy.Moves[i].PP > 0 {
 			return &b.Enemy.Moves[i]
 		}
 	}
-	return nil
+	return &struggleMove
 }
 
 func (b *Battle) Run() BattleResult {
@@ -283,7 +309,11 @@ func (b *Battle) Run() BattleResult {
 		fmt.Printf("Your:  %s\n", b.Player)
 		fmt.Printf("Enemy: %s\n", b.Enemy)
 
-		playerMove := b.playerChooseMove()
+		playerMove, ok := b.playerChooseMove()
+		if !ok {
+			fmt.Println("\nBattle aborted.")
+			return ResultAborted
+		}
 		enemyMove := b.enemyChooseMove()
 
 		b.ResolveTurn(playerMove, enemyMove)
@@ -298,6 +328,8 @@ func (b *Battle) Run() BattleResult {
 				fmt.Printf("%s fainted! You lose!\n", b.Player.Name)
 			case ResultDraw:
 				fmt.Println("Both Pokemon fainted! It's a draw!")
+			case ResultAborted:
+				// handled above before ResolveTurn
 			}
 			return result
 		}
