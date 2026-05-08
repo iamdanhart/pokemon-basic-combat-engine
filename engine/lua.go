@@ -1,0 +1,149 @@
+package engine
+
+import (
+	"fmt"
+
+	lua "github.com/yuin/gopher-lua"
+)
+
+type VM struct {
+	L       *lua.LState
+	Species map[string]*Species
+	Moves   map[string]*Move
+}
+
+func NewVM() *VM {
+	return &VM{
+		L:       lua.NewState(),
+		Species: make(map[string]*Species),
+		Moves:   make(map[string]*Move),
+	}
+}
+
+func (vm *VM) Close() {
+	vm.L.Close()
+}
+
+func (vm *VM) LoadScripts(dir string) error {
+	if err := vm.L.DoFile(dir + "/pokemon.lua"); err != nil {
+		return fmt.Errorf("loading pokemon.lua: %w", err)
+	}
+	if err := vm.loadSpecies(); err != nil {
+		return fmt.Errorf("parsing pokemon.lua: %w", err)
+	}
+
+	if err := vm.L.DoFile(dir + "/moves.lua"); err != nil {
+		return fmt.Errorf("loading moves.lua: %w", err)
+	}
+	if err := vm.loadMoves(); err != nil {
+		return fmt.Errorf("parsing moves.lua: %w", err)
+	}
+
+	return nil
+}
+
+func (vm *VM) loadSpecies() error {
+	tbl, ok := vm.L.GetGlobal("Pokemon").(*lua.LTable)
+	if !ok {
+		return fmt.Errorf("expected Pokemon to be a table")
+	}
+
+	var outerErr error
+	tbl.ForEach(func(key, val lua.LValue) {
+		if outerErr != nil {
+			return
+		}
+		entry, ok := val.(*lua.LTable)
+		if !ok {
+			return
+		}
+
+		s := &Species{}
+		s.Name = lua.LVAsString(entry.RawGetString("name"))
+
+		typesTbl, ok := entry.RawGetString("types").(*lua.LTable)
+		if !ok {
+			outerErr = fmt.Errorf("species %q: types must be a table", s.Name)
+			return
+		}
+		typesTbl.ForEach(func(_, tv lua.LValue) {
+			if outerErr != nil || s.NumTypes >= 2 {
+				return
+			}
+			t, err := TypeFromString(lua.LVAsString(tv))
+			if err != nil {
+				outerErr = fmt.Errorf("species %q: %w", s.Name, err)
+				return
+			}
+			s.Types[s.NumTypes] = t
+			s.NumTypes++
+		})
+		if outerErr != nil {
+			return
+		}
+
+		s.BaseHP = int(lua.LVAsNumber(entry.RawGetString("hp")))
+		s.BaseAtk = int(lua.LVAsNumber(entry.RawGetString("atk")))
+		s.BaseDef = int(lua.LVAsNumber(entry.RawGetString("def")))
+		s.BaseSpd = int(lua.LVAsNumber(entry.RawGetString("spd")))
+
+		vm.Species[lua.LVAsString(key)] = s
+	})
+
+	return outerErr
+}
+
+func (vm *VM) loadMoves() error {
+	tbl, ok := vm.L.GetGlobal("Moves").(*lua.LTable)
+	if !ok {
+		return fmt.Errorf("expected Moves to be a table")
+	}
+
+	var outerErr error
+	tbl.ForEach(func(key, val lua.LValue) {
+		if outerErr != nil {
+			return
+		}
+		entry, ok := val.(*lua.LTable)
+		if !ok {
+			return
+		}
+
+		m := &Move{}
+		m.Name = lua.LVAsString(entry.RawGetString("name"))
+
+		t, err := TypeFromString(lua.LVAsString(entry.RawGetString("type")))
+		if err != nil {
+			outerErr = fmt.Errorf("move %q: %w", m.Name, err)
+			return
+		}
+		m.Type = t
+
+		switch lua.LVAsString(entry.RawGetString("category")) {
+		case "physical":
+			m.Category = CategoryPhysical
+		case "special":
+			m.Category = CategorySpecial
+		case "status":
+			m.Category = CategoryStatus
+		default:
+			outerErr = fmt.Errorf("move %q: unknown category %q", m.Name, lua.LVAsString(entry.RawGetString("category")))
+			return
+		}
+
+		m.Power = int(lua.LVAsNumber(entry.RawGetString("power")))
+		m.Accuracy = int(lua.LVAsNumber(entry.RawGetString("accuracy")))
+		m.PP = int(lua.LVAsNumber(entry.RawGetString("pp")))
+		m.PPMax = m.PP
+
+		if fn, ok := entry.RawGetString("effect").(*lua.LFunction); ok {
+			fnName := "effect_" + lua.LVAsString(key)
+			vm.L.SetGlobal(fnName, fn)
+			m.EffectFunc = fnName
+		}
+
+		vm.Moves[lua.LVAsString(key)] = m
+	})
+
+	return outerErr
+}
