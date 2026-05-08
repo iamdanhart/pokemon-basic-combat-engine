@@ -291,21 +291,16 @@ func (b *Battle) allOutOfPP(p *Pokemon) bool {
 }
 
 func (b *Battle) enemyChooseMove() *Move {
-	if b.allOutOfPP(b.Enemy) {
-		return &struggleMove
-	}
-	for range 10 {
-		m := &b.Enemy.Moves[rand.Intn(len(b.Enemy.Moves))]
-		if m.PP > 0 {
-			return m
-		}
-	}
+	available := make([]*Move, 0, len(b.Enemy.Moves))
 	for i := range b.Enemy.Moves {
 		if b.Enemy.Moves[i].PP > 0 {
-			return &b.Enemy.Moves[i]
+			available = append(available, &b.Enemy.Moves[i])
 		}
 	}
-	return &struggleMove
+	if len(available) == 0 {
+		return &struggleMove
+	}
+	return available[rand.Intn(len(available))]
 }
 
 func (b *Battle) Run() BattleResult {
