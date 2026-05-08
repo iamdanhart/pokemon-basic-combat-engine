@@ -48,6 +48,8 @@ func NewBattle(player, enemy *Pokemon, vm *VM) *Battle {
 }
 
 func (b *Battle) applyMove(actor, target *Pokemon, move *Move) {
+	move.PP--
+
 	if move.Category == CategoryStatus {
 		b.callLuaEffect(actor, target, move)
 		return
@@ -183,12 +185,30 @@ func (b *Battle) playerChooseMove() *Move {
 			fmt.Printf("Enter a number between 1 and %d.\n", len(b.Player.Moves))
 			continue
 		}
-		return &b.Player.Moves[n-1]
+		move := &b.Player.Moves[n-1]
+		if move.PP <= 0 {
+			fmt.Println("That move has no PP left!")
+			continue
+		}
+		return move
 	}
 }
 
 func (b *Battle) enemyChooseMove() *Move {
-	return &b.Enemy.Moves[rand.Intn(len(b.Enemy.Moves))]
+	// try up to 10 times to find a move with PP remaining
+	for range 10 {
+		m := &b.Enemy.Moves[rand.Intn(len(b.Enemy.Moves))]
+		if m.PP > 0 {
+			return m
+		}
+	}
+	// fallback: return the first move with PP
+	for i := range b.Enemy.Moves {
+		if b.Enemy.Moves[i].PP > 0 {
+			return &b.Enemy.Moves[i]
+		}
+	}
+	return nil
 }
 
 func (b *Battle) Run() BattleResult {
