@@ -12,16 +12,6 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-type BattleState int
-
-const (
-	StateStart BattleState = iota
-	StateChooseMove
-	StateResolveTurn
-	StateCheckFaint
-	StateBattleOver
-)
-
 type BattleResult int
 
 const (
@@ -34,7 +24,6 @@ const (
 type Battle struct {
 	Player  *Pokemon
 	Enemy   *Pokemon
-	State   BattleState
 	Turn    int
 	vm      *VM
 	scanner *bufio.Scanner
@@ -53,7 +42,6 @@ func NewBattle(player, enemy *Pokemon, vm *VM) *Battle {
 	return &Battle{
 		Player:  player,
 		Enemy:   enemy,
-		State:   StateStart,
 		Turn:    1,
 		vm:      vm,
 		scanner: bufio.NewScanner(os.Stdin),

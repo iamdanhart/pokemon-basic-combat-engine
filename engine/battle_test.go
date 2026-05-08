@@ -21,7 +21,6 @@ func newTestBattle(player, enemy *Pokemon) *Battle {
 	return &Battle{
 		Player: player,
 		Enemy:  enemy,
-		State:  StateStart,
 		Turn:   1,
 		vm:     NewVM(),
 		out:    io.Discard,
