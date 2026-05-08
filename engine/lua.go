@@ -21,10 +21,20 @@ type VM struct {
 
 func NewVM() *VM {
 	L := lua.NewState()
-	// Seed Lua's math.random with the current time so rolls vary each run
 	if err := L.DoString(fmt.Sprintf("math.randomseed(%d)", time.Now().UnixNano())); err != nil {
 		panic(fmt.Sprintf("failed to seed Lua RNG: %v", err))
 	}
+
+	// Expose StatusEffect constants to Lua so scripts use Status.paralysis rather than magic numbers.
+	statusConsts := L.NewTable()
+	L.SetField(statusConsts, "none",      lua.LNumber(StatusNone))
+	L.SetField(statusConsts, "burn",      lua.LNumber(StatusBurn))
+	L.SetField(statusConsts, "paralysis", lua.LNumber(StatusParalyze))
+	L.SetField(statusConsts, "sleep",     lua.LNumber(StatusSleep))
+	L.SetField(statusConsts, "poison",    lua.LNumber(StatusPoison))
+	L.SetField(statusConsts, "freeze",    lua.LNumber(StatusFreeze))
+	L.SetGlobal("Status", statusConsts)
+
 	return &VM{
 		L:           L,
 		Species:     make(map[string]*Species),

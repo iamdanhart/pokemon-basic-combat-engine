@@ -36,8 +36,8 @@ Moves = {
         category = "status",
         power = 0, accuracy = 90, pp = 20,
         effect = function(actor, target)
-            if target.status == 0 then
-                target.status = 2  -- StatusParalyze
+            if target.status == Status.none then
+                target.status = Status.paralysis
             end
         end,
     },

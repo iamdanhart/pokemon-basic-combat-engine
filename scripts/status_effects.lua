@@ -4,7 +4,7 @@
 --
 -- Timed statuses (sleep, freeze): the move effect that applies them must set
 -- pokemon.status_turns to the desired duration. The hook decrements each turn
--- and clears the status (pokemon.status = 0) when it reaches 0.
+-- and clears the status (pokemon.status = Status.none) when it reaches 0.
 
 StatusEffects = {
     burn = {
@@ -27,7 +27,7 @@ StatusEffects = {
     sleep = {
         on_turn_start = function(pokemon)
             if pokemon.status_turns <= 0 then
-                pokemon.status = 0  -- wake up
+                pokemon.status = Status.none  -- wake up
             else
                 pokemon.status_turns = pokemon.status_turns - 1
                 pokemon.skip_turn = true
@@ -37,7 +37,7 @@ StatusEffects = {
     freeze = {
         on_turn_start = function(pokemon)
             if math.random(100) <= 10 then
-                pokemon.status = 0  -- thaw out
+                pokemon.status = Status.none  -- thaw out
             else
                 pokemon.skip_turn = true
             end
