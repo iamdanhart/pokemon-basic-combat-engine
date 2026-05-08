@@ -17,7 +17,7 @@ A simplified Pokemon-style combat engine built in Go with Lua scripting. This is
 - No abilities or natures
 - No multi-hit moves (e.g. Fury Attack)
 - No two-turn moves (e.g. Fly, Dig)
-- No recoil moves (e.g. Double-Edge)
+- No recoil moves (e.g. Double-Edge) — Struggle is the exception and does deal recoil
 - No binding moves (e.g. Wrap)
 - No self-destruct moves (e.g. Explosion)
 

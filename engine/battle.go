@@ -105,6 +105,12 @@ func (b *Battle) applyMove(actor, target *Pokemon, move *Move) {
 
 	target.HP -= damage
 	fmt.Fprintf(b.out, "%s took %d damage! %s\n", target.Name, damage, target)
+
+	if move.PPMax == 0 {
+		recoil := max(actor.MaxHP/4, 1)
+		actor.HP -= recoil
+		fmt.Fprintf(b.out, "%s is hit by recoil! %s\n", actor.Name, actor)
+	}
 }
 
 // Modified Gen 1 formula - omits the random factor and STAB bonus for simplicity

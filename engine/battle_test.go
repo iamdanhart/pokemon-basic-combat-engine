@@ -182,6 +182,20 @@ func TestResolveTurnFasterGoesFirst(t *testing.T) {
 	}
 }
 
+func TestStruggleRecoil(t *testing.T) {
+	s := testSpecies()
+	attacker := NewPokemon(s, 50, nil)
+	defender := NewPokemon(s, 50, nil)
+
+	b := newTestBattle(attacker, defender)
+	b.applyMove(attacker, defender, &struggleMove)
+
+	wantRecoil := max(attacker.MaxHP/4, 1)
+	if attacker.HP != attacker.MaxHP-wantRecoil {
+		t.Errorf("expected attacker HP %d after recoil, got %d", attacker.MaxHP-wantRecoil, attacker.HP)
+	}
+}
+
 func TestAllOutOfPP(t *testing.T) {
 	s := testSpecies()
 	p := NewPokemon(s, 50, []Move{
